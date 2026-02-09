@@ -7,19 +7,31 @@
 
 <style>
 :root {
-  --bg:#fff; --fg:#111; --card:#f4f4f4;
+  --bg:#ffffff;
+  --fg:#111111;
+  --card:#f4f4f4;
 }
 body.dark {
-  --bg:#121212; --fg:#eee; --card:#1e1e1e;
+  --bg:#121212;
+  --fg:#eeeeee;
+  --card:#1e1e1e;
 }
 body {
-  background:var(--bg); color:var(--fg);
+  background:var(--bg);
+  color:var(--fg);
   font-family:system-ui,sans-serif;
-  margin:0; padding:20px;
+  margin:0;
+  padding:20px;
+}
+header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
 .card {
   background:var(--card);
-  padding:16px; border-radius:12px;
+  padding:16px;
+  border-radius:12px;
   margin-bottom:16px;
 }
 .controls {
@@ -40,7 +52,7 @@ body {
 </head>
 
 <body>
-<header style="display:flex;justify-content:space-between;align-items:center">
+<header>
   <h1>🔊 Noise Monitor</h1>
   <button onclick="toggleDark()">🌓</button>
 </header>
@@ -92,96 +104,142 @@ body {
 const ctx = document.getElementById("chart").getContext("2d");
 
 function colorFor(db){
-  if(db<=-30)return"#2ecc71";
-  if(db<=-20)return"#f1c40f";
-  if(db<=-10)return"#e67e22";
-  return"#e74c3c";
+  if(db <= 40) return "#2ecc71";
+  if(db <= 55) return "#f1c40f";
+  if(db <= 70) return "#e67e22";
+  return "#e74c3c";
 }
 
-const gradient = ctx.createLinearGradient(0,0,0,400);
-gradient.addColorStop(0,"rgba(231,76,60,0.35)");
-gradient.addColorStop(0.5,"rgba(241,196,15,0.25)");
-gradient.addColorStop(1,"rgba(46,204,113,0.2)");
+// Gradient fill
+const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+gradient.addColorStop(0, "rgba(231,76,60,0.35)");
+gradient.addColorStop(0.5, "rgba(241,196,15,0.25)");
+gradient.addColorStop(1, "rgba(46,204,113,0.20)");
 
-const chart = new Chart(ctx,{
-  type:"line",
-  data:{labels:[],datasets:[{
-    label:"Noise (approx dBA)",
-    data:[],
-    borderColor:[],
-    backgroundColor:gradient,
-    fill:true,
-    tension:0.25,
-    pointRadius:0
-  }]},
-  options:{
-    scales:{
-      y:{
-        min:20,max:90,
-        title:{display:true,text:"dBA (approx)"}
+const chart = new Chart(ctx, {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [{
+      label: "Noise (approx dBA)",
+      data: [],
+      borderColor: [],
+      backgroundColor: gradient,
+      fill: true,
+      tension: 0.25,
+      pointRadius: 0
+    }]
+  },
+  options: {
+    animation: false,
+    scales: {
+      y: {
+        min: 20,
+        max: 90,
+        ticks: {
+          callback: v => `${v} dBA`
+        }
       }
     }
   }
 });
 
+// Dynamic Y-axis scaling
+function computeYAxis(values) {
+  if (values.length === 0) return { min: 20, max: 90 };
+
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+
+  const range = max - min || 5;
+  const padding = Math.max(range * 0.25, 3);
+
+  min = Math.floor(min - padding);
+  max = Math.ceil(max + padding);
+
+  // Clamp to sensible SPL limits
+  min = Math.max(min, 20);
+  max = Math.min(max, 100);
+
+  // Prevent ultra-flat graphs
+  if (max - min < 10) {
+    min -= 5;
+    max += 5;
+  }
+
+  return { min, max };
+}
+
 function classify(db){
-  if(db<=40)return["Comfortable","green"];
-  if(db<=55)return["Noticeable","yellow"];
-  if(db<=70)return["Loud","orange"];
-  return["Excessive","red"];
+  if(db <= 40) return ["Comfortable", "green"];
+  if(db <= 55) return ["Noticeable", "yellow"];
+  if(db <= 70) return ["Loud", "orange"];
+  return ["Excessive", "red"];
 }
 
 function applyPreset(){
-  const h=document.getElementById("preset").value;
-  if(!h)return;
-  const end=new Date();
-  const start=new Date(end.getTime()-h*3600*1000);
-  document.getElementById("start").value=start.toISOString().slice(0,16);
-  document.getElementById("end").value=end.toISOString().slice(0,16);
+  const h = document.getElementById("preset").value;
+  if(!h) return;
+
+  const end = new Date();
+  const start = new Date(end.getTime() - h * 3600 * 1000);
+
+  document.getElementById("start").value = start.toISOString().slice(0,16);
+  document.getElementById("end").value = end.toISOString().slice(0,16);
 }
 
 async function refresh(){
-  const start=document.getElementById("start").value;
-  const end=document.getElementById("end").value;
-  const cal=parseFloat(document.getElementById("cal").value)||0;
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+  const cal = parseFloat(document.getElementById("cal").value) || 0;
 
-  const params=new URLSearchParams();
-  if(start)params.append("start",start);
-  if(end)params.append("end",end);
+  const params = new URLSearchParams();
+  if(start) params.append("start", start);
+  if(end) params.append("end", end);
 
-  const data=await fetch("/api/history?"+params).then(r=>r.json());
+  const data = await fetch("/api/history?" + params).then(r => r.json());
 
-  const labels=[],values=[],colors=[];
+  const labels = [];
+  const values = [];
+  const colors = [];
+
   for(const p of data){
-    const spl=p.peak_max+cal+100; // relative dBFS→dBA mapping
+    const spl = p.peak_max + cal + 100; // relative dBFS → dBA-ish
     labels.push(new Date(p.minute).toLocaleString());
     values.push(spl);
-    colors.push(colorFor(spl-100));
+    colors.push(colorFor(spl));
   }
 
-  chart.data.labels=labels;
-  chart.data.datasets[0].data=values;
-  chart.data.datasets[0].borderColor=colors;
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = values;
+  chart.data.datasets[0].borderColor = colors;
+
+  const axis = computeYAxis(values);
+  chart.options.scales.y.min = axis.min;
+  chart.options.scales.y.max = axis.max;
+
   chart.update();
 
-  const latest=values.at(-1);
+  const latest = values.at(-1);
   if(latest){
-    const [label,cls]=classify(latest);
-    document.getElementById("current").innerText=
+    const [label, cls] = classify(latest);
+    document.getElementById("current").innerText =
       `${latest.toFixed(1)} dBA`;
-    const badge=document.getElementById("label");
-    badge.innerText=label;
-    badge.className=`badge ${cls}`;
+    const badge = document.getElementById("label");
+    badge.innerText = label;
+    badge.className = `badge ${cls}`;
   }
 }
 
 function toggleDark(){
   document.body.classList.toggle("dark");
-  localStorage.setItem("dark",
-    document.body.classList.contains("dark"));
+  localStorage.setItem(
+    "dark",
+    document.body.classList.contains("dark")
+  );
 }
 
-if(localStorage.getItem("dark")==="true"){
+if(localStorage.getItem("dark") === "true"){
   document.body.classList.add("dark");
 }
 
