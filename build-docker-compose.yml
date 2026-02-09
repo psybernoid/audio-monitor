@@ -1,0 +1,37 @@
+services:
+  audio-monitor-db:
+    image: mariadb:11
+    container_name: audio-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 10s
+      retries: 5
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: $DB_ROOT_PASS
+      MYSQL_DATABASE: $DB_NAME
+      MYSQL_USER: $DB_USER
+      MYSQL_PASSWORD: $DB_PASSWD
+    volumes:
+      - ./db:/var/lib/mysql
+
+  audio-monitor:
+    build: .
+    container_name: audio-monitor
+    restart: unless-stopped
+    depends_on:
+      audio-monitor-db:
+        condition: service_healthy
+    ports:
+      - 8000:8000
+    env_file:
+      - .env
+    environment:
+      RTSP_URL: $RTSP_URL
+      SAMPLE_INTERVAL: 5
+      DB_HOST: $DB_HOST
+      DB_NAME: $DB_NAME
+      DB_USER: $DB_USER
+      DB_PASS: $DB_PASSWD
