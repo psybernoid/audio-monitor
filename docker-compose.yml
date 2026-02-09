@@ -18,7 +18,7 @@ services:
       - ./db:/var/lib/mysql
 
   audio-monitor:
-    image: docker pull ghcr.io/psybernoid/audio-monitor:latest
+    image: ghcr.io/psybernoid/audio-monitor:latest
     container_name: audio-monitor
     restart: unless-stopped
     depends_on:
