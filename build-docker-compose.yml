@@ -30,7 +30,7 @@ services:
       - .env
     environment:
       RTSP_URL: $RTSP_URL
-      SAMPLE_INTERVAL: 5
+      SAMPLE_INTERVAL: $SAMPLE_INTERVAL
       DB_HOST: $DB_HOST
       DB_NAME: $DB_NAME
       DB_USER: $DB_USER
